@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:notes/app/ui/widgets/paginated_table/data_table.dart';
 import 'package:notes/app/ui/widgets/paginated_table/data_table_source.dart';
 import 'package:notes/app/ui/widgets/paginated_table/paginated_table.dart';
+import 'package:notes/data/datasources/patient_data_source.dart';
 import 'package:notes/shared/theme.dart';
-import 'package:notes/source/patient.dart';
+import 'package:notes/data/models/patient.dart';
+import 'package:provider/provider.dart';
 
 class TablePatient extends StatefulWidget {
   const TablePatient({super.key});
@@ -12,14 +14,15 @@ class TablePatient extends StatefulWidget {
   State<TablePatient> createState() => _TablePatientState();
 }
 
-class PatientDataSource extends DataTableSourceCustom {
-  late List<Patient> selectedPatient;
-  late final List<Patient> _patients = Patient.getPatient();
+class PatientData extends DataTableSourceCustom {
+  List<Patient>? _patients;
+  List<Document>? _document;
+
   bool selected = false;
   int _selectedCount = 0;
 
   @override
-  int get rowCount => _patients.length;
+  int get rowCount => _patients!.length;
 
   @override
   bool get isRowCountApproximate => false;
@@ -29,7 +32,7 @@ class PatientDataSource extends DataTableSourceCustom {
 
   @override
   DataRowCustom getRows(int index) {
-    final Patient patients = _patients[index];
+    final _patient = _document![index];
     return DataRowCustom.byIndex(
         selected: selected,
         onSelectChanged: (value) {
@@ -42,22 +45,23 @@ class PatientDataSource extends DataTableSourceCustom {
         },
         index: index,
         cells: <DataCellCustom>[
-          DataCellCustom(Text(patients.name)),
-          DataCellCustom(Text(patients.gender)),
-          DataCellCustom(Text(patients.numberRM.toString())),
-          DataCellCustom(Text(patients.cityOB)),
-          DataCellCustom(Text(patients.dateOB)),
-          DataCellCustom(Text(patients.address)),
-          DataCellCustom(Text(patients.numberPhone))
+          DataCellCustom(Text(_patient.name.toString())),
         ]);
   }
 }
 
 class _TablePatientState extends State<TablePatient> {
-  final PatientDataSource _patientDataSource = PatientDataSource();
-  late List<Patient> patients;
-  late List<Patient> selectedPatient;
+  PatientData? _patientDataSource;
+  late Future<Patient> _patient;
 
+  @override
+  void initState() {
+    super.initState();
+    _patient = PatientDataSource().getPatient();
+  }
+
+  // late List<Patient> patients;
+  // late List<Patient> selectedPatient;
   PaginatedDataTableCustom dataBody() {
     return PaginatedDataTableCustom(
       rowsPerPage: 15,
@@ -100,7 +104,7 @@ class _TablePatientState extends State<TablePatient> {
       ],
       columnSpacing: 0,
       horizontalMargin: 0,
-      source: _patientDataSource,
+      source: _patientDataSource!,
     );
   }
 
@@ -112,12 +116,32 @@ class _TablePatientState extends State<TablePatient> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 112.0, vertical: 36.0),
-                child: Container(
-                    width: MediaQuery.of(context).size.width,
-                    child: dataBody()),
-              ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 112.0, vertical: 36.0),
+                  child: FutureBuilder(
+                      future: _patient,
+                      builder: (context, AsyncSnapshot<Patient> snapshot) {
+                        var state = snapshot.connectionState;
+                        if (state != ConnectionState.done) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        } else {
+                  
+                          if (snapshot.hasData) {
+                            return Container(
+                                width: MediaQuery.of(context).size.width,
+                                child: dataBody());
+                          } else if (snapshot.hasError) {
+                            return Center(
+                              child: Material(
+                                child: Text(snapshot.error.toString()),
+                              ),
+                            );
+                          } else {
+                            return const Material(child: Text(''));
+                          }
+                        }
+                      })),
             ],
           ),
         ));
